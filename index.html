@@ -96,9 +96,7 @@
           <span class="text-6xl text-green-500 material-icons-outlined mb-4"
             >security</span
           >
-          <h1 class="text-2xl font-bold mb-8 text-gray-700">
-            もちチャットV
-          </h1>
+          <h1 class="text-2xl font-bold mb-8 text-gray-700">もちチャットV</h1>
           <input
             v-model="authEmail"
             type="email"
@@ -572,15 +570,70 @@
 
             <div
               v-if="showStickerPicker"
-              class="h-48 bg-gray-50 border-t overflow-y-auto p-2 grid grid-cols-4 gap-2 shrink-0"
+              class="h-64 bg-[#eceff1] border-t flex flex-col shrink-0"
             >
-              <template v-for="setId in myStampIds"
-                ><img
-                  v-for="img in getStampImages(setId)"
-                  :src="img"
-                  @click="sendMsg('sticker', img)"
-                  class="w-full aspect-square bg-white rounded-lg border p-1 shadow-sm cursor-pointer"
-              /></template>
+              <div
+                class="h-12 bg-white flex items-center px-2 overflow-x-auto shrink-0 border-b border-gray-200 space-x-2 hide-scrollbar"
+              >
+                <button
+                  @click.stop="showStickerPicker = 'recent'"
+                  class="w-10 h-10 p-1 flex items-center justify-center shrink-0 rounded-md transition"
+                  :class="showStickerPicker === 'recent' ? 'bg-gray-200 text-gray-700' : 'text-gray-400 hover:text-gray-600'"
+                >
+                  <span class="material-icons-outlined text-xl">schedule</span>
+                </button>
+                <div class="w-px h-5 bg-gray-300 shrink-0 mx-1"></div>
+
+                <div
+                  v-for="setId in myStampIds"
+                  :key="setId"
+                  @click.stop="showStickerPicker = setId"
+                  class="w-10 h-10 p-1 cursor-pointer shrink-0 rounded-md flex items-center justify-center transition"
+                  :class="{'bg-gray-200': showStickerPicker === setId || (showStickerPicker === true && myStampIds[0] === setId)}"
+                >
+                  <img
+                    v-if="getStampImages(setId) && getStampImages(setId).length > 0"
+                    :src="getStampImages(setId)[0]"
+                    class="w-7 h-7 object-contain rounded-sm"
+                  />
+                </div>
+              </div>
+
+              <div class="flex-1 overflow-y-auto p-3 hide-scrollbar">
+                <div
+                  v-show="showStickerPicker === 'recent'"
+                  class="grid grid-cols-4 gap-3 content-start"
+                >
+                  <img
+                    v-for="img in recentStickers"
+                    :key="img"
+                    :src="img"
+                    @click="sendMsg('sticker', img); addRecentSticker(img)"
+                    class="w-full aspect-square bg-white rounded-lg border p-1 shadow-sm cursor-pointer hover:bg-gray-100 transition"
+                  />
+                  <div
+                    v-if="!recentStickers || recentStickers.length === 0"
+                    class="col-span-4 text-center text-gray-400 text-sm mt-4 font-medium"
+                  >
+                    最近使ったスタンプはありません
+                  </div>
+                </div>
+
+                <template v-for="setId in myStampIds" :key="setId">
+                  <div
+                    v-show="showStickerPicker === setId || (showStickerPicker === true && myStampIds[0] === setId)"
+                    class="grid grid-cols-4 gap-3 content-start"
+                  >
+                    <img
+                      v-for="img in getStampImages(setId)"
+                      :key="img"
+                      :src="img"
+                      @click="sendMsg('sticker', img); addRecentSticker(img)"
+                      class="w-full aspect-square bg-white rounded-lg border p-1 shadow-sm cursor-pointer hover:bg-gray-100 transition"
+                    />
+                  </div>
+                </template>
+              </div>
             </div>
           </div>
 
@@ -983,6 +1036,20 @@
 
       createApp({
         setup() {
+          const recentStickers = Vue.ref([]); // 最近使ったスタンプを記憶する配列
+
+          // スタンプを使ったら履歴に追加する関数（最大5個まで）
+          const addRecentSticker = (imgUrl) => {
+            // すでに履歴にある場合は一旦削除して一番前に持ってくる
+            recentStickers.value = recentStickers.value.filter(
+              (url) => url !== imgUrl
+            );
+            recentStickers.value.unshift(imgUrl);
+            // 5個を超えたら古いものを削除
+            if (recentStickers.value.length > 5) {
+              recentStickers.value.pop();
+            }
+          };
           const processImageFile = async (file) => {
             return new Promise((resolve) => {
               const reader = new FileReader();
@@ -1380,38 +1447,18 @@
             newRoomName.value = "";
           };
 
-          // ↓この performSearch = async () => { から } までを書き換え
           const performSearch = async () => {
             if (!searchQuery.value) return;
-
-            // 入力された文字の前後から空白を消す（重要！）
-            const searchText = searchQuery.value.trim();
-
-            try {
-              const q = query(
-                collection(db, "users"),
-                where("displayName", "==", searchText)
-              );
-              const s = await getDocs(q);
-
-              // 検索結果を表示（自分は除外する）
-              searchResults.value = s.docs
-                .map((d) => d.data())
-                .filter((u) => u.uid !== currentUser.value.uid);
-
-              // デバッグ用：コンソールに結果を出す（後で消してOK）
-              console.log("検索結果:", searchResults.value);
-
-              if (searchResults.value.length === 0) {
-                alert(
-                  "「" + searchText + "」で見つかるユーザーはいませんでした。"
-                );
-              }
-            } catch (error) {
-              console.error("検索エラー:", error);
-              alert("検索中にエラーが起きました。");
-            }
+            const q = query(
+              collection(db, "users"),
+              where("displayName", "==", searchQuery.value)
+            );
+            const s = await getDocs(q);
+            searchResults.value = s.docs
+              .map((d) => d.data())
+              .filter((u) => u.uid !== currentUser.value.uid);
           };
+
           const addFriend = async (u) => {
             await setDoc(
               doc(db, "users", currentUser.value.uid, "friends", u.uid),
@@ -1636,6 +1683,8 @@
             unblockUser,
             deleteChatRoom,
             deleteChatRoomInView,
+            recentStickers, // ←これを追加
+            addRecentSticker, // ←これを追加
           };
         },
       }).mount("#app");
