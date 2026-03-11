@@ -453,7 +453,7 @@
             </div>
           </div>
 
-          <div
+<div
             v-if="currentView === 'chat'"
             class="absolute inset-0 bg-[#8fbbe9] flex flex-col z-[50]"
           >
@@ -470,10 +470,25 @@
                   >{{ activeRoom.displayName || activeRoom.name }}</span
                 >
               </div>
-              <div class="relative">
+
+              <div class="flex items-center space-x-1 relative">
+                <button
+                  @click="startCall(false)"
+                  class="material-icons-outlined text-gray-600 p-2 hover:text-green-500 transition"
+                >
+                  call
+                </button>
+                
+                <button
+                  @click="startCall(true)"
+                  class="material-icons-outlined text-gray-600 p-2 hover:text-green-500 transition"
+                >
+                  videocam
+                </button>
+
                 <button
                   @click="showChatMenu = !showChatMenu"
-                  class="material-icons-outlined text-gray-600 p-2"
+                  class="material-icons-outlined text-gray-600 p-2 hover:text-green-500 transition"
                 >
                   more_horiz
                 </button>
