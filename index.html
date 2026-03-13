@@ -85,58 +85,10 @@
         }
       }
     </style>
-<div class="h-14 bg-white/95 backdrop-blur flex items-center px-4 justify-between border-b shadow-sm shrink-0">
-  <div class="flex items-center space-x-3 overflow-hidden">
-    <span class="material-icons-outlined cursor-pointer text-gray-600 hover:text-green-500" @click="closeChat">arrow_back_ios</span>
-    <span class="font-bold truncate text-gray-800">{{ activeRoom.displayName || activeRoom.name }}</span>
-  </div>
-  
-  <div class="flex items-center space-x-4">
-    <button @click="startCall(false)" class="text-gray-600 hover:text-green-500">
-      <span class="material-icons-outlined">call</span>
-    </button>
-    <button @click="startCall(true)" class="text-gray-600 hover:text-green-500">
-      <span class="material-icons-outlined">videocam</span>
-    </button>
-    <div class="relative">
-      <button @click="showChatMenu = !showChatMenu" class="material-icons-outlined text-gray-600 p-2">more_horiz</button>
-      </div>
-  </div>
-  </div>
-
-<div v-show="isCalling" class="absolute inset-0 z-[200] bg-gray-900 flex flex-col items-center justify-center">
-  <video ref="remoteVideo" autoplay playsinline class="w-full h-full object-cover"></video>
-  
-  <video ref="localVideo" autoplay playsinline muted class="absolute top-16 right-4 w-24 h-36 bg-black border border-gray-600 rounded-lg object-cover shadow-lg"></video>
-
-  <div class="absolute bottom-10 left-0 w-full flex justify-center space-x-6">
-    <button @click="hangUp" class="w-16 h-16 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition">
-      <span class="material-icons">call_end</span>
-    </button>
-  </div>
-</div>  
-</head>
+  </head>
   <body>
     <div id="app">
-<div v-if="incomingCall" class="absolute inset-0 z-[250] bg-black/80 flex flex-col items-center justify-center p-4 backdrop-blur-sm">
-  <div class="bg-white w-full max-w-sm rounded-3xl p-8 text-center shadow-2xl transform animation-slide-up">
-    <div class="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
-      <span class="material-icons-outlined text-4xl text-green-500">ring_volume</span>
-    </div>
-    <h3 class="font-bold text-xl text-gray-800 mb-2">通話の着信</h3>
-    <p class="text-gray-500 mb-8 text-sm">ルームのメンバーから着信しています</p>
-    
-    <div class="flex justify-center space-x-8">
-      <button @click="rejectCall" class="w-16 h-16 bg-red-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition">
-        <span class="material-icons">call_end</span>
-      </button>
-      <button @click="joinCall(incomingCall.id)" class="w-16 h-16 bg-green-500 text-white rounded-full flex items-center justify-center shadow-lg hover:scale-105 transition">
-        <span class="material-icons">call</span>
-      </button>
-    </div>
-  </div>
-</div>      
-<div class="app-container">
+      <div class="app-container">
         <div
           v-if="!currentUser"
           class="absolute inset-0 z-[100] bg-white flex flex-col items-center justify-center p-8"
@@ -790,8 +742,7 @@
                 /><span class="absolute right-8 top-3 text-xs text-gray-400"
                   >モチ</span
                 >
-              ue) return [];
-            return chatRooms.va</div>
+              </div>
               <button
                 @click="executeSend"
                 class="w-full bg-blue-500 text-white p-3 rounded-lg font-bold shadow"
@@ -1099,135 +1050,7 @@
               recentStickers.value.pop();
             }
           };
-// WebRTC関連の変数（追加分）
-const incomingCall = ref(null); // 着信情報を保持する変数
-
-// ★ 既存の openChat 関数の中に「着信監視」の処理を追加します
-const openChat = (room) => {
-  activeRoom.value = room;
-  currentView.value = "chat";
-  
-  // (中略...既存のメッセージ監視処理)
-
-  // ↓↓↓ ここから追加：通話の着信監視 ↓↓↓
-  onSnapshot(collection(db, "rooms", room.id, "calls"), (snapshot) => {
-    snapshot.docChanges().forEach((change) => {
-      if (change.type === "added") {
-        const callData = change.doc.data();
-        // 自分が発信中でなく、Offer（発信データ）が届いた場合に着信画面を出す
-        if (!isCalling.value && callData.offer) {
-          incomingCall.value = { id: change.doc.id, ...callData };
-        }
-      }
-      // 通話が切断（データ削除）されたら着信画面を閉じる
-      if (change.type === "removed" && incomingCall.value?.id === change.doc.id) {
-        incomingCall.value = null;
-      }
-    });
-  });
-  // ↑↑↑ ここまで追加 ↑↑↑
-};
-
-// ★ 電話に出る（Answerを作成する）処理
-const joinCall = async (callId) => {
-  isCalling.value = true;
-  incomingCall.value = null; // 着信画面を消す
-
-  try {
-    // 1. 自分のカメラとマイクを取得
-    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
-    if (localVideo.value) {
-      localVideo.value.srcObject = localStream;
-    }
-
-    peerConnection = new RTCPeerConnection(servers);
-    remoteStream = new MediaStream();
-    if (remoteVideo.value) {
-      remoteVideo.value.srcObject = remoteStream;
-    }
-
-    // 自分のトラックを追加
-    localStream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    // 相手のトラックを受信
-    peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
-    };
-
-    const callDoc = doc(db, `rooms/${activeRoom.value.id}/calls`, callId);
-    const offerCandidates = collection(callDoc, 'offerCandidates');
-    const answerCandidates = collection(callDoc, 'answerCandidates');
-
-    // ICE候補を取得したらFirestoreに保存（Answer側）
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(answerCandidates, event.candidate.toJSON());
-      }
-    };
-
-    // 発信側（Offer）のデータを受け取る
-    const callData = (await getDoc(callDoc)).data();
-    const offerDescription = callData.offer;
-    await peerConnection.setRemoteDescription(new RTCSessionDescription(offerDescription));
-
-    // 着信側（Answer）のデータを作成してFirestoreに保存
-    const answerDescription = await peerConnection.createAnswer();
-    await peerConnection.setLocalDescription(answerDescription);
-
-    const answer = {
-      type: answerDescription.type,
-      sdp: answerDescription.sdp,
-    };
-    await updateDoc(callDoc, { answer });
-
-    // 発信側のICE候補を待機
-    onSnapshot(offerCandidates, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const candidate = new RTCIceCandidate(change.doc.data());
-          peerConnection.addIceCandidate(candidate);
-        }
-      });
-    });
-
-  } catch (error) {
-    console.error("通話応答エラー:", error);
-    alert("通話に接続できませんでした。");
-    hangUp();
-  }
-};
-
-// ★ 着信を拒否する処理
-const rejectCall = () => {
-  if (incomingCall.value) {
-    // Firestore上の通話データを削除して相手に通話終了を知らせる
-    deleteDoc(doc(db, `rooms/${activeRoom.value.id}/calls`, incomingCall.value.id));
-    incomingCall.value = null;
-  }
-};
-// WebRTC関連の変数 (setup() 内に追加)
-const isCalling = ref(false);
-const localVideo = ref(null);  // 自分のvideoタグの参照
-const remoteVideo = ref(null); // 相手のvideoタグの参照
-
-let peerConnection = null;
-let localStream = null;
-let remoteStream = null;
-
-// STUNサーバー（P2P通信のために自分のグローバルIPを知るためのGoogleの無料サーバー）
-const servers = {
-  iceServers: [
-    {
-      urls: ['stun:stun1.l.google.com:19302', 'stun:stun2.l.google.com:19302'],
-    },
-  ],
-  iceCandidatePoolSize: 10,
-};         
- const processImageFile = async (file) => {
+          const processImageFile = async (file) => {
             return new Promise((resolve) => {
               const reader = new FileReader();
               reader.onload = (e) => {
@@ -1310,107 +1133,9 @@ const servers = {
             () => currentUser.value?.email === ADMIN_EMAIL
           );
 
-// 通話を開始する関数
-const startCall = async (videoEnabled) => {
-  isCalling.value = true;
-  
-  try {
-    // 1. カメラとマイクのストリームを取得
-    localStream = await navigator.mediaDevices.getUserMedia({
-      video: videoEnabled,
-      audio: true
-    });
-    
-    // HTMLのvideoタグに自分の映像をセット
-    if (localVideo.value) {
-      localVideo.value.srcObject = localStream;
-    }
-
-    // 2. WebRTCのコネクションを作成
-    peerConnection = new RTCPeerConnection(servers);
-    remoteStream = new MediaStream();
-    if (remoteVideo.value) {
-      remoteVideo.value.srcObject = remoteStream;
-    }
-
-    // トラックをコネクションに追加
-    localStream.getTracks().forEach((track) => {
-      peerConnection.addTrack(track, localStream);
-    });
-
-    // 相手のトラックを受信したときの処理
-    peerConnection.ontrack = (event) => {
-      event.streams[0].getTracks().forEach((track) => {
-        remoteStream.addTrack(track);
-      });
-    };
-
-    // 3. Firestoreを使ったシグナリング（電話をかける処理）
-    // ※今回は room のドキュメント内に call サブコレクションを作る想定
-    const callDoc = doc(collection(db, `rooms/${activeRoom.value.id}/calls`));
-    const offerCandidates = collection(callDoc, 'offerCandidates');
-    const answerCandidates = collection(callDoc, 'answerCandidates');
-
-    // ICE候補（接続経路）を取得したらFirestoreに保存
-    peerConnection.onicecandidate = (event) => {
-      if (event.candidate) {
-        addDoc(offerCandidates, event.candidate.toJSON());
-      }
-    };
-
-    // Offerを作成してFirestoreに保存
-    const offerDescription = await peerConnection.createOffer();
-    await peerConnection.setLocalDescription(offerDescription);
-
-    const offer = {
-      sdp: offerDescription.sdp,
-      type: offerDescription.type,
-    };
-    await setDoc(callDoc, { offer });
-
-    // 4. 相手からのAnswerを待機（リッスン）
-    onSnapshot(callDoc, (snapshot) => {
-      const data = snapshot.data();
-      if (!peerConnection.currentRemoteDescription && data?.answer) {
-        const answerDescription = new RTCSessionDescription(data.answer);
-        peerConnection.setRemoteDescription(answerDescription);
-      }
-    });
-
-    // 相手のICE候補を待機
-    onSnapshot(answerCandidates, (snapshot) => {
-      snapshot.docChanges().forEach((change) => {
-        if (change.type === 'added') {
-          const candidate = new RTCIceCandidate(change.doc.data());
-          peerConnection.addIceCandidate(candidate);
-        }
-      });
-    });
-
-  } catch (error) {
-    console.error("通話エラー:", error);
-    alert("カメラまたはマイクへのアクセスが拒否されました。");
-    hangUp();
-  }
-};
-
-// 通話を終了する関数
-const hangUp = () => {
-  isCalling.value = false;
-  if (peerConnection) {
-    peerConnection.close();
-  }
-  if (localStream) {
-    localStream.getTracks().forEach(track => track.stop());
-  }
-  if (remoteStream) {
-    remoteStream.getTracks().forEach(track => track.stop());
-  }
-  // ※ 必要に応じてFirestore上の call データを削除する処理を追加
-};          
-
-const displayTalks = computed(() => {
-            if (!currentUser.vallue.map((r) => {
+          const displayTalks = computed(() => {
+            if (!currentUser.value) return [];
+            return chatRooms.value.map((r) => {
               let name = r.name;
               let photoURL = null;
               if (r.type === "direct" && r.members) {
@@ -1960,14 +1685,6 @@ const displayTalks = computed(() => {
             deleteChatRoomInView,
             recentStickers, // ←これを追加
             addRecentSticker, // ←これを追加
-isCalling,
-    localVideo,
-    remoteVideo,
-    incomingCall,
-    startCall,
-    joinCall,
-    rejectCall,
-    hangUp,
           };
         },
       }).mount("#app");
